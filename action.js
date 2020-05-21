@@ -1,35 +1,35 @@
-import { getInput } from '@actions/core';
-import { render } from 'mustache';
-import { promises as fs } from 'fs';
+const Mustache = require('mustache');
+const fs = require('fs').promises;
+const core = require('@actions/core');
 
-async function parseTemplate(){
-  const consulUrl = getInput('url', { required: true });
-  const consulport = getInput('port', { required: true });
-  const consulSecure = getInput('secure', { required: false });
-  const consulDatacenter = getInput('datacenter', { required: false });
-  const consulToken = getInput('token', { required: false });
-  const consulKey = getInput('key', { required: false });
-  const consulCA = getInput('ca', { require: false });
+async function parseTemplate () {
+  const consulUrl = core.getInput('url', { required: true });
+  const consulport = core.getInput('port', { required: true });
+  const consulSecure = core.getInput('secure', { required: false });
+  const consulDatacenter = core.getInput('datacenter', { required: false });
+  const consulToken = core.getInput('token', { required: false });
+  const consulKey = core.getInput('key', { required: false });
+  const consulCA = core.getInput('ca', { require: false });
 
-  const valuesExtras = getInput('extras', { requried: false });
+  const valuesExtras = core.getInput('extras', { requried: false });
 
-  const templateFile = getInput('template', { required: true });
+  const templateFile = core.getInput('template', { required: true });
   try {
     await fs.stat(templateFile)
-  } catch(e) {
+  } catch (e) {
     console.log(e)
     throw e;
   }
 
   let templateOut;
-  const outFile = getInput('out', { required: false });
-  if (outFile.length == 0){
+  const outFile = core.getInput('out', { required: false });
+  if (outFile.length === 0) {
     templateOut = `${templateFile}.parsed`;
   } else {
     templateOut = outFile;
   }
 
-  console.log("connecting to consul");
+  console.log('connecting to consul');
 
   const consul = require('consul')({
     host: consulUrl,
@@ -48,23 +48,23 @@ async function parseTemplate(){
     const parsed = valuesExtras ? JSON.parse(valuesExtras) : {};
     values = parsed
   } catch (e) {
-    console.log(e);
+    console.log(`trouble parsing extra values (${e.messgae})`);
     throw e;
   }
 
   try {
-    console.log(`gitting key values from consul for ${consulKey}`);
+    console.log(`getting key values from consul for ${consulKey}`);
 
-    const keys = await consul.kv.get({key: consulKey, recurse: true});
+    const keys = await consul.kv.get({ key: consulKey, recurse: true });
     for (const key of keys) {
-      if (key.Key.slice(-1) == "/") {
+      if (key.Key.slice(-1) === '/') {
         continue;
       }
       const keySplit = key.Key.split('/');
-      values[keySplit[keySplit.length-1]] = key.Value;
+      values[keySplit[keySplit.length - 1]] = key.Value;
     }
-  } catch(e) {
-    console.log(e);
+  } catch (e) {
+    console.log(`trouble getting values from consul (${e.message})`);
     throw e;
   }
 
@@ -73,10 +73,10 @@ async function parseTemplate(){
   try {
     console.log(`Parsing file ${templateFile}`);
     const data = await fs.readFile(templateFile, 'utf-8');
-    const p = render(data, values);
+    const p = Mustache.render(data, values);
     parsed = p;
   } catch (e) {
-    console.log(e);
+    console.log(`trouble rendering template file (${e.message})`);
     throw e;
   }
 
@@ -84,9 +84,9 @@ async function parseTemplate(){
     console.log(`Writing output file ${templateOut}`);
     await fs.writeFile(templateOut, parsed);
   } catch (e) {
-    console.log(e);
+    console.log(`trouble writing template file output (${e.message})`);
     throw e
   }
 };
 
-export default {parseTemplate};
+module.exports = { parseTemplate };

@@ -34,10 +34,8 @@ module.exports =
 /******/ 	// the startup function
 /******/ 	function startup() {
 /******/ 		// Load entry module and return exports
-/******/ 		return __webpack_require__(646);
+/******/ 		return __webpack_require__(888);
 /******/ 	};
-/******/ 	// initialize runtime
-/******/ 	runtime(__webpack_require__);
 /******/
 /******/ 	// run startup
 /******/ 	return startup();
@@ -487,6 +485,105 @@ function escape(s) {
 /***/ (function(module) {
 
 module.exports = require("querystring");
+
+/***/ }),
+
+/***/ 198:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+const Mustache = __webpack_require__(681);
+const fs = __webpack_require__(747).promises;
+const core = __webpack_require__(369);
+
+async function parseTemplate () {
+  const consulUrl = core.getInput('url', { required: true });
+  const consulport = core.getInput('port', { required: true });
+  const consulSecure = core.getInput('secure', { required: false });
+  const consulDatacenter = core.getInput('datacenter', { required: false });
+  const consulToken = core.getInput('token', { required: false });
+  const consulKey = core.getInput('key', { required: false });
+  const consulCA = core.getInput('ca', { require: false });
+
+  const valuesExtras = core.getInput('extras', { requried: false });
+
+  const templateFile = core.getInput('template', { required: true });
+  try {
+    await fs.stat(templateFile)
+  } catch (e) {
+    console.log(e)
+    throw e;
+  }
+
+  let templateOut;
+  const outFile = core.getInput('out', { required: false });
+  if (outFile.length === 0) {
+    templateOut = `${templateFile}.parsed`;
+  } else {
+    templateOut = outFile;
+  }
+
+  console.log('connecting to consul');
+
+  const consul = __webpack_require__(612)({
+    host: consulUrl,
+    port: consulport,
+    secure: consulSecure,
+    ca: [consulCA],
+    defaults: {
+      dc: consulDatacenter | 'dc1',
+      token: consulToken
+    },
+    promisify: true
+  });
+
+  let values
+  try {
+    const parsed = valuesExtras ? JSON.parse(valuesExtras) : {};
+    values = parsed
+  } catch (e) {
+    console.log(`trouble parsing extra values (${e.messgae})`);
+    throw e;
+  }
+
+  try {
+    console.log(`getting key values from consul for ${consulKey}`);
+
+    const keys = await consul.kv.get({ key: consulKey, recurse: true });
+    for (const key of keys) {
+      if (key.Key.slice(-1) === '/') {
+        continue;
+      }
+      const keySplit = key.Key.split('/');
+      values[keySplit[keySplit.length - 1]] = key.Value;
+    }
+  } catch (e) {
+    console.log(`trouble getting values from consul (${e.message})`);
+    throw e;
+  }
+
+  let parsed;
+
+  try {
+    console.log(`Parsing file ${templateFile}`);
+    const data = await fs.readFile(templateFile, 'utf-8');
+    const p = Mustache.render(data, values);
+    parsed = p;
+  } catch (e) {
+    console.log(`trouble rendering template file (${e.message})`);
+    throw e;
+  }
+
+  try {
+    console.log(`Writing output file ${templateOut}`);
+    await fs.writeFile(templateOut, parsed);
+  } catch (e) {
+    console.log(`trouble writing template file output (${e.message})`);
+    throw e
+  }
+};
+
+module.exports = { parseTemplate };
+
 
 /***/ }),
 
@@ -3392,128 +3489,6 @@ exports.Client = Client;
 
 /***/ }),
 
-/***/ 646:
-/***/ (function(__unusedmodule, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-
-// EXTERNAL MODULE: ./node_modules/@actions/core/lib/core.js
-var core = __webpack_require__(369);
-
-// EXTERNAL MODULE: ./node_modules/mustache/mustache.js
-var mustache = __webpack_require__(681);
-
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __webpack_require__(747);
-
-// CONCATENATED MODULE: ./action.js
-
-
-
-
-async function parseTemplate(){
-  const consulUrl = Object(core.getInput)('url', { required: true });
-  const consulport = Object(core.getInput)('port', { required: true });
-  const consulSecure = Object(core.getInput)('secure', { required: false });
-  const consulDatacenter = Object(core.getInput)('datacenter', { required: false });
-  const consulToken = Object(core.getInput)('token', { required: false });
-  const consulKey = Object(core.getInput)('key', { required: false });
-  const consulCA = Object(core.getInput)('ca', { require: false });
-
-  const valuesExtras = Object(core.getInput)('extras', { requried: false });
-
-  const templateFile = Object(core.getInput)('template', { required: true });
-  try {
-    await Object(external_fs_.promises.stat)(templateFile)
-  } catch(e) {
-    console.log(e)
-    throw e;
-  }
-
-  let templateOut;
-  const outFile = Object(core.getInput)('out', { required: false });
-  if (outFile.length == 0){
-    templateOut = `${templateFile}.parsed`;
-  } else {
-    templateOut = outFile;
-  }
-
-  console.log("connecting to consul");
-
-  const consul = __webpack_require__(612)({
-    host: consulUrl,
-    port: consulport,
-    secure: consulSecure,
-    ca: [consulCA],
-    defaults: {
-      dc: consulDatacenter | 'dc1',
-      token: consulToken
-    },
-    promisify: true
-  });
-
-  let values
-  try {
-    const parsed = valuesExtras ? JSON.parse(valuesExtras) : {};
-    values = parsed
-  } catch (e) {
-    console.log(e);
-    throw e;
-  }
-
-  try {
-    console.log(`gitting key values from consul for ${consulKey}`);
-
-    const keys = await consul.kv.get({key: consulKey, recurse: true});
-    for (const key of keys) {
-      if (key.Key.slice(-1) == "/") {
-        continue;
-      }
-      const keySplit = key.Key.split('/');
-      values[keySplit[keySplit.length-1]] = key.Value;
-    }
-  } catch(e) {
-    console.log(e);
-    throw e;
-  }
-
-  let parsed;
-
-  try {
-    console.log(`Parsing file ${templateFile}`);
-    const data = await Object(external_fs_.promises.readFile)(templateFile, 'utf-8');
-    const p = Object(mustache.render)(data, values);
-    parsed = p;
-  } catch (e) {
-    console.log(e);
-    throw e;
-  }
-
-  try {
-    console.log(`Writing output file ${templateOut}`);
-    await Object(external_fs_.promises.writeFile)(templateOut, parsed);
-  } catch (e) {
-    console.log(e);
-    throw e
-  }
-};
-
-/* harmony default export */ var action = ({parseTemplate});
-// CONCATENATED MODULE: ./index.js
-
-
-
-(async () => {
-  try {
-    await Object(core.group)('Parse template', /* Cannot get final name for export "parseTemplate" in "./action.js" (known exports: default, known reexports: ) */ undefined);
-  } catch (error) {
-    Object(core.setFailed)(error.message);
-  }
-})();
-
-/***/ }),
-
 /***/ 660:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -5673,6 +5648,23 @@ module.exports = {"_args":[["papi@0.29.1","/home/seth/dev/hexly/consul-values"]]
 
 /***/ }),
 
+/***/ 888:
+/***/ (function(__unusedmodule, __unusedexports, __webpack_require__) {
+
+const core = __webpack_require__(369);
+const { parseTemplate } = __webpack_require__(198);
+
+(async () => {
+  try {
+    await core.group('Parse template', parseTemplate);
+  } catch (error) {
+    core.setFailed(error.message);
+  }
+})();
+
+
+/***/ }),
+
 /***/ 948:
 /***/ (function(__unusedmodule, exports) {
 
@@ -6027,62 +6019,4 @@ exports.REQUEST_OPTIONS = exports.CLIENT_OPTIONS.concat([
 
 /***/ })
 
-/******/ },
-/******/ function(__webpack_require__) { // webpackRuntimeModules
-/******/ 	"use strict";
-/******/ 
-/******/ 	/* webpack/runtime/make namespace object */
-/******/ 	!function() {
-/******/ 		// define __esModule on exports
-/******/ 		__webpack_require__.r = function(exports) {
-/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
-/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
-/******/ 			}
-/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ 	/* webpack/runtime/define property getter */
-/******/ 	!function() {
-/******/ 		// define getter function for harmony exports
-/******/ 		var hasOwnProperty = Object.prototype.hasOwnProperty;
-/******/ 		__webpack_require__.d = function(exports, name, getter) {
-/******/ 			if(!hasOwnProperty.call(exports, name)) {
-/******/ 				Object.defineProperty(exports, name, { enumerable: true, get: getter });
-/******/ 			}
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ 	/* webpack/runtime/create fake namespace object */
-/******/ 	!function() {
-/******/ 		// create a fake namespace object
-/******/ 		// mode & 1: value is a module id, require it
-/******/ 		// mode & 2: merge all properties of value into the ns
-/******/ 		// mode & 4: return value when already ns object
-/******/ 		// mode & 8|1: behave like require
-/******/ 		__webpack_require__.t = function(value, mode) {
-/******/ 			if(mode & 1) value = this(value);
-/******/ 			if(mode & 8) return value;
-/******/ 			if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
-/******/ 			var ns = Object.create(null);
-/******/ 			__webpack_require__.r(ns);
-/******/ 			Object.defineProperty(ns, 'default', { enumerable: true, value: value });
-/******/ 			if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
-/******/ 			return ns;
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ 	/* webpack/runtime/compat get default export */
-/******/ 	!function() {
-/******/ 		// getDefaultExport function for compatibility with non-harmony modules
-/******/ 		__webpack_require__.n = function(module) {
-/******/ 			var getter = module && module.__esModule ?
-/******/ 				function getDefault() { return module['default']; } :
-/******/ 				function getModuleExports() { return module; };
-/******/ 			__webpack_require__.d(getter, 'a', getter);
-/******/ 			return getter;
-/******/ 		};
-/******/ 	}();
-/******/ 	
-/******/ }
-);
+/******/ });
